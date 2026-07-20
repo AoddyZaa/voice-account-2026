@@ -16,7 +16,6 @@ def load_data():
     return pd.DataFrame(columns=["วันที่บันทึก", "เดือน/ปี", "รายการ", "ยอดยกมา", "รายรับ", "รายจ่าย", "ยอดคงเหลือ"])
 
 def calculate_balance(df):
-    """คำนวณยอดคงเหลือใหม่ทั้งตาราง ตั้งแต่แถวแรกถึงแถวสุดท้าย"""
     if df.empty: return df
     bal = 0
     new_balances = []
@@ -71,7 +70,21 @@ with st.expander("➕ บันทึกรายการใหม่", expande
 # จัดการรายการ (ลบ/แก้ไข)
 st.subheader("📝 จัดการรายการ")
 edited_df = st.data_editor(st.session_state.df, use_container_width=True, num_rows="dynamic")
-if st.button("🗑️ ยืนยันการลบ / อัปเดตตาราง"):
+
+# ปุ่มยืนยันและปุ่มพิมพ์
+c_btn1, c_btn2 = st.columns([1, 4])
+if c_btn1.button("🗑️ ยืนยันการลบ / อัปเดต"):
     st.session_state.df = calculate_balance(edited_df)
     st.session_state.df.to_excel(DB_FILE, index=False)
     st.rerun()
+
+# ปุ่มพิมพ์รายงาน (Export Excel)
+output = BytesIO()
+with pd.ExcelWriter(output, engine='openpyxl') as writer:
+    filtered_df.to_excel(writer, index=False)
+c_btn2.download_button(
+    label="🖨️ พิมพ์ข้อมูลออกเป็น Excel",
+    data=output.getvalue(),
+    file_name=f"Financial_Report_{selected_month}.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
