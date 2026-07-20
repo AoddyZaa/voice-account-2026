@@ -5,88 +5,73 @@ import os
 from io import BytesIO
 
 st.set_page_config(page_title="Financial Intel 2026", layout="wide")
-
-st.markdown("<style>.stApp {background-color: #f8f9fa;}</style>", unsafe_allow_html=True)
-
 st.title("📊 Financial Intelligence 2026")
 DB_FILE = "finance_data.xlsx"
 
-# ตารางชื่อเดือนภาษาไทย
-TH_MONTHS = {
-    "01": "มกราคม", "02": "กุมภาพันธ์", "03": "มีนาคม", "04": "เมษายน",
-    "05": "พฤษภาคม", "06": "มิถุนายน", "07": "กรกฎาคม", "08": "สิงหาคม",
-    "09": "กันยายน", "10": "ตุลาคม", "11": "พฤศจิกายน", "12": "ธันวาคม"
-}
+TH_MONTHS = {"01": "มกราคม", "02": "กุมภาพันธ์", "03": "มีนาคม", "04": "เมษายน", "05": "พฤษภาคม", "06": "มิถุนายน", "07": "กรกฎาคม", "08": "สิงหาคม", "09": "กันยายน", "10": "ตุลาคม", "11": "พฤศจิกายน", "12": "ธันวาคม"}
 
 def load_data():
-    expected_cols = ["วันที่บันทึก", "เดือน/ปี", "รายการ", "ยอดยกมา", "รายรับ", "รายจ่าย", "ยอดคงเหลือ"]
     if os.path.exists(DB_FILE):
-        df = pd.read_excel(DB_FILE)
-        # ถ้าโหลดมาแล้วคอลัมน์ไม่ครบ ให้สร้างใหม่
-        for col in expected_cols:
-            if col not in df.columns:
-                df[col] = 0 if col != "รายการ" and col != "วันที่บันทึก" and col != "เดือน/ปี" else ""
-        return df
-    return pd.DataFrame(columns=expected_cols)
+        return pd.read_excel(DB_FILE)
+    return pd.DataFrame(columns=["วันที่บันทึก", "เดือน/ปี", "รายการ", "ยอดยกมา", "รายรับ", "รายจ่าย", "ยอดคงเหลือ"])
+
+def calculate_balance(df):
+    """คำนวณยอดคงเหลือใหม่ทั้งตาราง ตั้งแต่แถวแรกถึงแถวสุดท้าย"""
+    if df.empty: return df
+    bal = 0
+    new_balances = []
+    for _, row in df.iterrows():
+        bal = bal + float(row['ยอดยกมา']) + float(row['รายรับ']) - float(row['รายจ่าย'])
+        new_balances.append(bal)
+    df['ยอดคงเหลือ'] = new_balances
+    return df
 
 if "df" not in st.session_state:
     st.session_state.df = load_data()
 
-def reset_form():
-    st.session_state.item_name = ""
-    st.session_state.amount = 0.0
-
-if 'item_name' not in st.session_state: st.session_state.item_name = ""
-if 'amount' not in st.session_state: st.session_state.amount = 0.0
-
-# --- ระบบตัวกรอง (Sidebar) ---
+# Sidebar: กรองข้อมูล
 st.sidebar.header("🔍 กรองข้อมูล")
-if not st.session_state.df.empty and 'เดือน/ปี' in st.session_state.df.columns:
-    month_list = sorted(list(set(st.session_state.df['เดือน/ปี'].dropna())))
-    selected_month = st.sidebar.selectbox("เลือกเดือนที่ต้องการดู:", ["ทั้งหมด"] + month_list)
-else:
-    selected_month = "ทั้งหมด"
+months = sorted(list(set(st.session_state.df['เดือน/ปี'].dropna()))) if not st.session_state.df.empty else []
+selected_month = st.sidebar.selectbox("เลือกเดือนที่ต้องการดู:", ["ทั้งหมด"] + months)
 
+# Dashboard
 filtered_df = st.session_state.df
 if selected_month != "ทั้งหมด":
     filtered_df = st.session_state.df[st.session_state.df['เดือน/ปี'] == selected_month]
 
-# Dashboard
 col1, col2, col3 = st.columns(3)
 col1.metric("รายรับรวม", f"{filtered_df['รายรับ'].sum():,.2f}")
 col2.metric("รายจ่ายรวม", f"{filtered_df['รายจ่าย'].sum():,.2f}")
-col3.metric("ยอดคงเหลือ", f"{filtered_df['ยอดคงเหลือ'].iloc[-1] if not filtered_df.empty else 0:,.2f}")
+col3.metric("ยอดคงเหลือปัจจุบัน", f"{st.session_state.df['ยอดคงเหลือ'].iloc[-1] if not st.session_state.df.empty else 0:,.2f}")
 
 st.divider()
 
 # ฟอร์มบันทึก
+if 'form_key' not in st.session_state: st.session_state.form_key = 0
 with st.expander("➕ บันทึกรายการใหม่", expanded=True):
     c1, c2, c3 = st.columns(3)
-    with c1:
-        chosen_type = st.selectbox("ประเภท:", ["ยอดยกมา", "รายรับ", "รายจ่าย"], key="chosen_type")
-    with c2:
-        item_name = st.text_input("📝 รายการ:", key="item_name")
-    with c3:
-        amount = st.number_input("💵 จำนวนเงิน:", min_value=0.0, format="%.2f", key="amount")
+    chosen_type = c1.selectbox("ประเภท:", ["ยอดยกมา", "รายรับ", "รายจ่าย"], key=f"type_{st.session_state.form_key}")
+    item_name = c2.text_input("📝 รายการ:", key=f"item_{st.session_state.form_key}")
+    amount = c3.number_input("💵 จำนวนเงิน:", min_value=0.0, format="%.2f", key=f"amt_{st.session_state.form_key}")
     
     if st.button("🚀 บันทึกเข้าสู่ระบบ"):
         now = datetime.now()
-        month_key = now.strftime("%m")
-        month_year_str = f"{TH_MONTHS[month_key]} {now.year + 543}"
-        
-        prev_bal = st.session_state.df["ยอดคงเหลือ"].iloc[-1] if not st.session_state.df.empty else 0.0
-        row = {
-            "วันที่บันทึก": now.strftime("%d/%m/%Y"),
-            "เดือน/ปี": month_year_str,
-            "รายการ": item_name, 
-            "ยอดยกมา": amount if chosen_type=="ยอดยกมา" else 0,
-            "รายรับ": amount if chosen_type=="รายรับ" else 0,
-            "รายจ่าย": amount if chosen_type=="รายจ่าย" else 0,
-            "ยอดคงเหลือ": prev_bal + (amount if chosen_type != "รายจ่าย" else -amount)
-        }
-        st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([row])], ignore_index=True)
+        month_year_str = f"{TH_MONTHS[now.strftime('%m')]} {now.year + 543}"
+        new_row = pd.DataFrame([{
+            "วันที่บันทึก": now.strftime("%d/%m/%Y"), "เดือน/ปี": month_year_str, "รายการ": item_name, 
+            "ยอดยกมา": amount if chosen_type=="ยอดยกมา" else 0, "รายรับ": amount if chosen_type=="รายรับ" else 0, 
+            "รายจ่าย": amount if chosen_type=="รายจ่าย" else 0, "ยอดคงเหลือ": 0
+        }])
+        st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
+        st.session_state.df = calculate_balance(st.session_state.df)
         st.session_state.df.to_excel(DB_FILE, index=False)
-        reset_form()
+        st.session_state.form_key += 1
         st.rerun()
 
-st.dataframe(filtered_df, use_container_width=True)
+# จัดการรายการ (ลบ/แก้ไข)
+st.subheader("📝 จัดการรายการ")
+edited_df = st.data_editor(st.session_state.df, use_container_width=True, num_rows="dynamic")
+if st.button("🗑️ ยืนยันการลบ / อัปเดตตาราง"):
+    st.session_state.df = calculate_balance(edited_df)
+    st.session_state.df.to_excel(DB_FILE, index=False)
+    st.rerun()
