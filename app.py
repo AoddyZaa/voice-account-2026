@@ -10,14 +10,16 @@ st.title("📊 Financial Intelligence 2026")
 DB_FILE = "finance_data.xlsx"
 
 # โหลดหรือสร้างข้อมูล
+# แก้ฟังก์ชัน load_data เป็นแบบนี้ครับ
 def load_data():
     cols = ["วันที่บันทึก", "เดือน/ปี", "บัญชี", "รายการ", "ยอดยกมา", "รายรับ", "รายจ่าย", "ยอดคงเหลือ"]
     if os.path.exists(DB_FILE):
-        return pd.read_excel(DB_FILE)
+        df = pd.read_excel(DB_FILE)
+        # เช็คว่ามีคอลัมน์ 'บัญชี' ไหม ถ้าไม่มีให้เพิ่มเข้าไป
+        if 'บัญชี' not in df.columns:
+            df['บัญชี'] = 'ไม่ระบุ'
+        return df
     return pd.DataFrame(columns=cols)
-
-if "df" not in st.session_state:
-    st.session_state.df = load_data()
 
 # จัดการบัญชีใน Sidebar
 st.sidebar.header("🏦 จัดการบัญชี")
