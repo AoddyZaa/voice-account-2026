@@ -2,94 +2,137 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
-from io import BytesIO
 import plotly.express as px
+import io
 
+# --- ตั้งค่าหน้าจอและ CSS สำหรับความสวยงาม ---
 st.set_page_config(page_title="Financial Intelligence 2026", layout="wide")
-st.title("📊 Financial Intelligence 2026")
-DB_FILE = "finance_data.xlsx"
 
-# ฟังก์ชันคำนวณที่แก้ Error ให้แล้ว
-def calculate_balance(df):
-    if df.empty: return df
-    for acc in st.session_state.accounts:
-        mask = df['บัญชี'] == acc
-        # ใช้ .fillna(0) ป้องกันช่องว่าง และคำนวณสะสมให้เป็นค่าตัวเลขปกติ
-        df.loc[mask, 'ยอดคงเหลือ'] = (pd.to_numeric(df.loc[mask, 'ยอดยกมา'], errors='coerce').fillna(0) + 
-                                     pd.to_numeric(df.loc[mask, 'รายรับ'], errors='coerce').fillna(0) - 
-                                     pd.to_numeric(df.loc[mask, 'รายจ่าย'], errors='coerce').fillna(0)).cumsum()
-    return df
-
-# โหลดข้อมูล
-def load_data():
-    cols = ["วันที่บันทึก", "เดือน/ปี", "บัญชี", "รายการ", "ยอดยกมา", "รายรับ", "รายจ่าย", "ยอดคงเหลือ"]
-    if os.path.exists(DB_FILE):
-        return pd.read_excel(DB_FILE).fillna(0)
-    return pd.DataFrame(columns=cols)
-
-if "df" not in st.session_state: st.session_state.df = load_data()
-if "accounts" not in st.session_state: st.session_state.accounts = ["ธ.ก.ส.", "กสิกร(เจ้านาย)", "กสิกร(แฟน)"]
-
-# Sidebar
-st.sidebar.header("🏦 จัดการบัญชี")
-new_acc = st.sidebar.text_input("เพิ่มบัญชี:")
-if st.sidebar.button("เพิ่มบัญชี") and new_acc and new_acc not in st.session_state.accounts:
-    st.session_state.accounts.append(new_acc)
-    st.rerun()
-
-st.sidebar.divider()
-st.sidebar.header("🔍 ตัวกรอง")
-filter_acc = st.sidebar.multiselect("เลือกบัญชี:", st.session_state.accounts, default=st.session_state.accounts)
-display_df = st.session_state.df[st.session_state.df['บัญชี'].isin(filter_acc)]
-
-# สรุปยอด
-st.subheader("💰 สรุปยอดคงเหลือ")
-cols = st.columns(len(st.session_state.accounts))
-for i, acc in enumerate(st.session_state.accounts):
-    acc_data = st.session_state.df[st.session_state.df['บัญชี'] == acc]
-    bal = acc_data['ยอดคงเหลือ'].iloc[-1] if not acc_data.empty else 0
-    cols[i].metric(acc, f"{float(bal):,.2f}")
-
-# ฟอร์มบันทึก
-with st.form("entry_form", clear_on_submit=True): # <--- ใส่ clear_on_submit=True ตรงนี้ครับ
-    c1, c2, c3, c4 = st.columns(4)
-    acc = c1.selectbox("บัญชี:", st.session_state.accounts, key="acc_in")
-    typ = c2.selectbox("ประเภท:", ["ยอดยกมา", "รายรับ", "รายจ่าย"], key="typ_in")
-    item = c3.text_input("รายการ:", key="item_in")
-    amt = c4.number_input("จำนวนเงิน:", min_value=0.0, key="amt_in")
+# ใส่ CSS เข้าไปเพื่อแต่ง Background และปุ่ม 3 มิติ
+st.markdown("""
+    <style>
+    /* Background ของทั้งหน้าจอ */
+    .stApp {
+        background: linear-gradient(135deg, #f6f8f9 0%, #e5ebee 100%);
+        background-image: url('https://www.transparenttextures.com/patterns/diagmonds-light.png');
+    }
     
-    if st.form_submit_button("🚀 บันทึกรายการ"):
-        new_data = {
-            "วันที่บันทึก": datetime.now().strftime("%d/%m/%Y"), 
-            "เดือน/ปี": datetime.now().strftime("%m/%Y"),
-            "บัญชี": acc, "รายการ": item,
-            "รายรับ": amt if typ=="รายรับ" else 0, 
-            "รายจ่าย": amt if typ=="รายจ่าย" else 0, 
-            "ยอดยกมา": amt if typ=="ยอดยกมา" else 0, 
-            "ยอดคงเหลือ": 0
-        }
-        st.session_state.df = calculate_balance(pd.concat([st.session_state.df, pd.DataFrame([new_data])], ignore_index=True))
-        st.session_state.df.to_excel(DB_FILE, index=False)
-        st.rerun() # พอสั่ง rerun หน้าจอจะรีเฟรช และ clear_on_submit จะเคลียร์ช่องให้เองครับ
+    /* แต่ง Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #ffffff;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    }
 
-# ตารางและกราฟ
-st.subheader("📈 กราฟและรายการ")
-if not display_df.empty:
-    fig = px.bar(display_df, x="วันที่บันทึก", y=["รายรับ", "รายจ่าย"], barmode="group")
-    st.plotly_chart(fig, use_container_width=True)
+    /* แต่ง Header ของ Sidebar */
+    .css-17lntkn {
+        color: #1f77b4;
+        font-weight: bold;
+    }
 
-edited_df = st.data_editor(display_df, num_rows="dynamic", use_container_width=True)
-if st.button("💾 บันทึกการแก้ไข"):
-    st.session_state.df = calculate_balance(edited_df)
-    st.session_state.df.to_excel(DB_FILE, index=False)
+    /* ปุ่ม 3 มิติ (ปุ่มบันทึก, อัปเดต, พิมพ์) */
+    div.stButton > button, div.stDownloadButton > button {
+        color: white !important;
+        border: none;
+        padding: 12px 24px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 8px;
+        /* เอฟเฟกต์ 3 มิติ */
+        background-color: #34a853; /* สีหลัก */
+        box-shadow: 0 4px #2e8651; 
+        transition: all 0.1s ease-in-out;
+    }
+    
+    /* เอฟเฟกต์ตอนกด (ปุ่มยุบลง) */
+    div.stButton > button:active, div.stDownloadButton > button:active {
+        box-shadow: 0 2px #2e8651;
+        transform: translateY(2px);
+    }
+    
+    /* เปลี่ยนสีปุ่มอัปเดตให้ต่างออกไป */
+    div[data-testid="stVerticalBlock"] > div > div > div > div[data-testid="stHorizontalBlock"] > div:first-child > div > div > button {
+        background-color: #ff9800; /* สีส้ม */
+        box-shadow: 0 4px #e68a00;
+    }
+    div[data-testid="stVerticalBlock"] > div > div > div > div[data-testid="stHorizontalBlock"] > div:first-child > div > div > button:active {
+        box-shadow: 0 2px #e68a00;
+    }
+
+     /* เปลี่ยนสีปุ่มพิมพ์ */
+    div.stDownloadButton > button {
+        background-color: #4285f4; /* สีฟ้า */
+        box-shadow: 0 4px #3367d6;
+    }
+    div.stDownloadButton > button:active {
+        box-shadow: 0 2px #3367d6;
+    }
+
+    /* กรอบของ Data Editor */
+    div[data-testid="stDataEditor"] {
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    </style>
+""", unsafe_allow_html=True)
+
+DATA_FILE = "data.csv"
+
+if not os.path.exists(DATA_FILE):
+    pd.DataFrame(columns=["วันที่", "รายการ", "บัญชี", "รายรับ", "รายจ่าย"]).to_csv(DATA_FILE, index=False, encoding='utf-8-sig')
+
+def get_data():
+    return pd.read_csv(DATA_FILE)
+
+st.title("📊 Financial Intelligence 2026")
+
+# 1. ฟอร์มบันทึก (พร้อมปุ่ม 3 มิติ)
+with st.sidebar.form("input_form", clear_on_submit=True):
+    st.header("➕ บันทึกรายการ")
+    date_input = st.date_input("วันที่", datetime.now())
+    item = st.text_input("รายการ")
+    account = st.selectbox("บัญชี", ["ธกส (เจ้านาย)", "กสิกรไทย (เจ้านาย)", "กสิกรไทย (น้องจอย)", "เงินสด"])
+    amount_type = st.radio("ประเภท", ["รายรับ", "รายจ่าย"])
+    amount = st.number_input("จำนวนเงิน", min_value=0.0, step=1.0)
+    if st.form_submit_button("💾 บันทึก"): # ปุ่ม 3 มิติ
+        new_df = pd.DataFrame([{"วันที่": date_input, "รายการ": item, "บัญชี": account, 
+                               "รายรับ": amount if amount_type == "รายรับ" else 0, 
+                               "รายจ่าย": amount if amount_type == "รายจ่าย" else 0}])
+        new_df.to_csv(DATA_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
+        st.rerun()
+
+# 2. จัดการข้อมูล (พร้อมปุ่มอัปเดต 3 มิติ)
+df = get_data()
+st.subheader("📋 รายการทั้งหมด (แก้ไขได้)")
+edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
+
+if st.button("🔄 อัปเดตและบันทึกข้อมูลใหม่"): # ปุ่มอัปเดต 3 มิติ
+    edited_df.to_csv(DATA_FILE, index=False, encoding='utf-8-sig')
+    st.success("อัปเดตข้อมูลเรียบร้อย!")
     st.rerun()
 
-# ดาวน์โหลด
-def to_excel_bytes(df):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False)
-    return output.getvalue()
+# 3. สรุปยอด
+st.subheader("💰 สรุปยอดคงเหลือ")
+df = get_data()
+grouped = df.groupby('บัญชี')[['รายรับ', 'รายจ่าย']].sum()
+grouped['ยอดคงเหลือ'] = grouped['รายรับ'] - grouped['รายจ่าย']
+summary = grouped.reset_index()
 
-st.download_button("💾 ดาวน์โหลดไฟล์ Excel", data=to_excel_bytes(st.session_state.df), file_name="Financial_Report.xlsx")
+num_accounts = len(summary)
+cols = st.columns(num_accounts)
+for i, row in summary.iterrows():
+    cols[i].metric(label=row['บัญชี'], value=f"{row['ยอดคงเหลือ']:,.2f}")
 
+# 4. สั่งพิมพ์ (ปุ่มดาวน์โหลด 3 มิติ)
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+    df.to_excel(writer, index=False, sheet_name='Data')
+st.download_button(label="🖨️ พิมพ์รายงาน (ดาวน์โหลด Excel)", data=buffer.getvalue(), file_name="report.xlsx", mime="application/vnd.ms-excel")
+
+# กราฟ
+fig = px.bar(summary, x='บัญชี', y='ยอดคงเหลือ', color='บัญชี', title="กราฟเปรียบเทียบแต่ละบัญชี")
+st.plotly_chart(fig, use_container_width=True)
