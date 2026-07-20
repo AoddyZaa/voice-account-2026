@@ -105,15 +105,15 @@ with st.sidebar.form("input_form", clear_on_submit=True):
         new_df.to_csv(DATA_FILE, mode='a', header=False, index=False, encoding='utf-8-sig')
         st.rerun()
 
-# 2. จัดการข้อมูล (พร้อมปุ่มอัปเดต 3 มิติ)
-df = get_data()
+# 2. จัดการข้อมูล และรีเฟรชข้อมูลล่าสุด
+df = get_data() # ดึงข้อมูลล่าสุดจากไฟล์ใหม่เสมอ
 st.subheader("📋 รายการทั้งหมด (แก้ไขได้)")
 edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
 
-if st.button("🔄 อัปเดตและบันทึกข้อมูลใหม่"): # ปุ่มอัปเดต 3 มิติ
+if st.button("🔄 อัปเดตและบันทึกข้อมูลใหม่"): 
     edited_df.to_csv(DATA_FILE, index=False, encoding='utf-8-sig')
     st.success("อัปเดตข้อมูลเรียบร้อย!")
-    st.rerun()
+    st.rerun() # สั่งให้หน้าจอรีเฟรชใหม่ทันทีหลังจากกดอัปเดต
 
 # 3. สรุปยอด
 st.subheader("💰 สรุปยอดคงเหลือ")
