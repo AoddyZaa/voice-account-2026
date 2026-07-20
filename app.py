@@ -1,71 +1,73 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import re
 import os
-from streamlit_mic_recorder import mic_recorder
+from io import BytesIO
 
-# 1. ตั้งค่าหน้าจอ UI
-st.set_page_config(page_title="Voice Expense 2026", layout="centered")
+st.set_page_config(page_title="Financial Intel 2026", layout="wide")
 
-st.title("📖 สมุดบัญชีดิจิทัล (เวอร์ชันแท็บเล็ต)")
-st.write("บันทึกรายรับ-รายจ่ายผ่านไมค์แท็บเล็ตได้เลยครับ")
+st.markdown("<style>.stApp {background-color: #f8f9fa;}</style>", unsafe_allow_html=True)
 
-# 💾 🛠️ ระบบจัดการฐานข้อมูลไฟล์
-DB_FILE = "expense_database.csv"
-BACKUP_FILE = "expense_database_backup.csv"
+st.title("📊 Financial Intelligence 2026")
+DB_FILE = "finance_data.xlsx"
 
 def load_data():
     if os.path.exists(DB_FILE):
-        try:
-            df = pd.read_csv(DB_FILE)
-            df = df.astype({"รายรับ (บาท)": "float64", "รายจ่าย (บาท)": "float64"})
-            return df
-        except:
-            pass
-    return pd.DataFrame(columns=["วัน-เวลา บันทึก", "เดือน-ปี", "รายการ", "รายรับ (บาท)", "รายจ่าย (บาท)", "ประเภทดิบ"])
+        return pd.read_excel(DB_FILE)
+    return pd.DataFrame(columns=["วันที่/เดือน", "รายการ", "ยอดยกมา", "รายรับ", "รายจ่าย", "ยอดคงเหลือ"])
 
-def save_data(df):
-    df.to_csv(DB_FILE, index=False)
+if "df" not in st.session_state:
+    st.session_state.df = load_data()
 
-if "expense_data" not in st.session_state:
-    st.session_state.expense_data = load_data()
+# --- ระบบตัวกรองเดือน (Sidebar) ---
+st.sidebar.header("🔍 กรองข้อมูล")
+if not st.session_state.df.empty:
+    # ดึงเฉพาะเดือนจากคอลัมน์ วันที่/เดือน (เช่น '07')
+    months = sorted(list(set([x.split('/')[1] for x in st.session_state.df['วันที่/เดือน'] if isinstance(x, str)])))
+    selected_month = st.sidebar.selectbox("เลือกเดือนที่ต้องการดู:", ["ทั้งหมด"] + months)
+else:
+    selected_month = "ทั้งหมด"
 
-# ส่วนพักข้อมูล
-if "temp_item" not in st.session_state: st.session_state.temp_item = ""
-if "temp_amount" not in st.session_state: st.session_state.temp_amount = 0.0
+# กรองข้อมูลตามที่เลือก
+filtered_df = st.session_state.df
+if selected_month != "ทั้งหมด":
+    filtered_df = st.session_state.df[st.session_state.df['วันที่/เดือน'].apply(lambda x: x.split('/')[1] == selected_month)]
 
-# ฟังก์ชันแปลงตัวเลข (เหมือนเดิม)
-def parse_thai_number_decimal(text):
-    text_clean = text.replace(",", "").replace("บาท", "").strip()
-    if "จุด" in text_clean:
-        parts = text_clean.split("จุด")
-        main_part, sub_part = parts[0].strip(), parts[1].strip()
-        main_val = float("".join(re.findall(r'\d+', main_part))) if "".join(re.findall(r'\d+', main_part)) else 0.0
-        sub_val = float("0." + "".join(re.findall(r'\d+', sub_part))) if "".join(re.findall(r'\d+', sub_part)) else 0.0
-        return main_val + sub_val
-    all_digits = "".join(re.findall(r'\d+', text_clean))
-    return float(all_digits) if all_digits else 0.0
+# Dashboard สรุปยอด (สรุปจากที่กรองแล้ว)
+col1, col2, col3 = st.columns(3)
+col1.metric("รายรับรวม", f"{filtered_df['รายรับ'].sum():,.2f}")
+col2.metric("รายจ่ายรวม", f"{filtered_df['รายจ่าย'].sum():,.2f}")
+col3.metric("ยอดคงเหลือ (ที่กรอง)", f"{filtered_df['ยอดคงเหลือ'].iloc[-1] if not filtered_df.empty else 0:,.2f}")
 
-# -------------------------------------------------------------------
-# 📝 ขั้นตอนการบันทึก
-# -------------------------------------------------------------------
-st.subheader("📝 ขั้นตอนการบันทึก")
-chosen_type = st.radio("🟢 เลือกประเภท:", options=["เงินคงเหลือยกมา", "รายรับ", "รายจ่าย"], index=1, horizontal=True)
+st.divider()
 
-st.write("🎙️ กดปุ่มไมค์แล้วพูดได้เลยครับ:")
-audio = mic_recorder(start_prompt="กดเพื่อเริ่มบันทึก", stop_prompt="กดเพื่อหยุด", just_once=True, use_container_width=True)
+# ฟอร์มบันทึก
+with st.expander("➕ บันทึกรายการใหม่", expanded=True):
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        chosen_type = st.selectbox("ประเภท:", ["ยอดยกมา", "รายรับ", "รายจ่าย"])
+    with c2:
+        item_name = st.text_input("📝 รายการ:")
+    with c3:
+        amount = st.number_input("💵 จำนวนเงิน:", min_value=0.0, format="%.2f")
+    
+    if st.button("🚀 บันทึกเข้าสู่ระบบ"):
+        prev_bal = st.session_state.df["ยอดคงเหลือ"].iloc[-1] if not st.session_state.df.empty else 0.0
+        row = {
+            "วันที่/เดือน": datetime.now().strftime("%d/%m"), "รายการ": item_name, 
+            "ยอดยกมา": amount if chosen_type=="ยอดยกมา" else 0,
+            "รายรับ": amount if chosen_type=="รายรับ" else 0,
+            "รายจ่าย": amount if chosen_type=="รายจ่าย" else 0,
+            "ยอดคงเหลือ": prev_bal + (amount if chosen_type != "รายจ่าย" else -amount)
+        }
+        st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([row])], ignore_index=True)
+        st.session_state.df.to_excel(DB_FILE, index=False)
+        st.rerun()
 
-if audio:
-    # ในส่วนนี้ streamlit-mic-recorder จะส่งค่าเป็นไฟล์เสียง
-    # แต่เนื่องจากเราต้องการ text ผมแนะนำให้ใช้การพิมพ์หรือถ้าเจ้านายต้องการฟีเจอร์แปลเสียง
-    # บน Cloud จะต้องใช้ API ของ Google Speech-to-Text ซึ่งซับซ้อนกว่า
-    # ณ ตอนนี้ ผมทำปุ่มให้รองรับการทำงานเบื้องต้นก่อนครับ
-    st.info("ได้รับไฟล์เสียงแล้ว (ฟังก์ชันแปลงเสียงกำลังพัฒนาต่อครับ)")
+# ตารางแสดงผลที่ผ่านการกรองแล้ว
+st.dataframe(filtered_df, use_container_width=True)
 
-txt_item = st.text_input("📝 ชื่อรายการ:", value=st.session_state.temp_item)
-txt_amount = st.number_input("💵 จำนวนเงิน (บาท):", min_value=0.0, value=float(st.session_state.temp_amount), format="%.2f")
-
-if st.button("💾 บันทึกลงสมุดบัญชี"):
-    # บันทึกข้อมูล...
-    st.success("บันทึกสำเร็จ!")
+# ดาวน์โหลด
+buffer = BytesIO()
+st.session_state.df.to_excel(buffer, index=False)
+st.download_button("📥 Export ข้อมูลทั้งหมดเป็น Excel", buffer, "Finance_Report_2026.xlsx", "application/vnd.ms-excel")
