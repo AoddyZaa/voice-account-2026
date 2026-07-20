@@ -19,9 +19,15 @@ TH_MONTHS = {
 }
 
 def load_data():
+    expected_cols = ["วันที่บันทึก", "เดือน/ปี", "รายการ", "ยอดยกมา", "รายรับ", "รายจ่าย", "ยอดคงเหลือ"]
     if os.path.exists(DB_FILE):
-        return pd.read_excel(DB_FILE)
-    return pd.DataFrame(columns=["วันที่บันทึก", "เดือน/ปี", "รายการ", "ยอดยกมา", "รายรับ", "รายจ่าย", "ยอดคงเหลือ"])
+        df = pd.read_excel(DB_FILE)
+        # ถ้าโหลดมาแล้วคอลัมน์ไม่ครบ ให้สร้างใหม่
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = 0 if col != "รายการ" and col != "วันที่บันทึก" and col != "เดือน/ปี" else ""
+        return df
+    return pd.DataFrame(columns=expected_cols)
 
 if "df" not in st.session_state:
     st.session_state.df = load_data()
@@ -35,8 +41,8 @@ if 'amount' not in st.session_state: st.session_state.amount = 0.0
 
 # --- ระบบตัวกรอง (Sidebar) ---
 st.sidebar.header("🔍 กรองข้อมูล")
-if not st.session_state.df.empty:
-    month_list = sorted(list(set(st.session_state.df['เดือน/ปี'])))
+if not st.session_state.df.empty and 'เดือน/ปี' in st.session_state.df.columns:
+    month_list = sorted(list(set(st.session_state.df['เดือน/ปี'].dropna())))
     selected_month = st.sidebar.selectbox("เลือกเดือนที่ต้องการดู:", ["ทั้งหมด"] + month_list)
 else:
     selected_month = "ทั้งหมด"
@@ -66,7 +72,6 @@ with st.expander("➕ บันทึกรายการใหม่", expande
     if st.button("🚀 บันทึกเข้าสู่ระบบ"):
         now = datetime.now()
         month_key = now.strftime("%m")
-        # แปลงเป็น: กรกฎาคม 2569 (บวก ค.ศ. 543)
         month_year_str = f"{TH_MONTHS[month_key]} {now.year + 543}"
         
         prev_bal = st.session_state.df["ยอดคงเหลือ"].iloc[-1] if not st.session_state.df.empty else 0.0
