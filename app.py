@@ -51,23 +51,26 @@ for i, acc in enumerate(st.session_state.accounts):
     cols[i].metric(acc, f"{float(bal):,.2f}")
 
 # ฟอร์มบันทึก
-with st.form("entry_form"):
+with st.form("entry_form", clear_on_submit=True): # <--- ใส่ clear_on_submit=True ตรงนี้ครับ
     c1, c2, c3, c4 = st.columns(4)
-    acc = c1.selectbox("บัญชี:", st.session_state.accounts)
-    typ = c2.selectbox("ประเภท:", ["ยอดยกมา", "รายรับ", "รายจ่าย"])
-    item = c3.text_input("รายการ:")
-    amt = c4.number_input("จำนวนเงิน:", min_value=0.0)
+    acc = c1.selectbox("บัญชี:", st.session_state.accounts, key="acc_in")
+    typ = c2.selectbox("ประเภท:", ["ยอดยกมา", "รายรับ", "รายจ่าย"], key="typ_in")
+    item = c3.text_input("รายการ:", key="item_in")
+    amt = c4.number_input("จำนวนเงิน:", min_value=0.0, key="amt_in")
+    
     if st.form_submit_button("🚀 บันทึกรายการ"):
-        # แก้การสร้าง Row ให้เป็นค่าเดี่ยว ไม่ใช่ List เพื่อเลี่ยง TypeError
         new_data = {
-            "วันที่บันทึก": datetime.now().strftime("%d/%m/%Y"), "เดือน/ปี": datetime.now().strftime("%m/%Y"),
+            "วันที่บันทึก": datetime.now().strftime("%d/%m/%Y"), 
+            "เดือน/ปี": datetime.now().strftime("%m/%Y"),
             "บัญชี": acc, "รายการ": item,
-            "รายรับ": amt if typ=="รายรับ" else 0, "รายจ่าย": amt if typ=="รายจ่าย" else 0, 
-            "ยอดยกมา": amt if typ=="ยอดยกมา" else 0, "ยอดคงเหลือ": 0
+            "รายรับ": amt if typ=="รายรับ" else 0, 
+            "รายจ่าย": amt if typ=="รายจ่าย" else 0, 
+            "ยอดยกมา": amt if typ=="ยอดยกมา" else 0, 
+            "ยอดคงเหลือ": 0
         }
         st.session_state.df = calculate_balance(pd.concat([st.session_state.df, pd.DataFrame([new_data])], ignore_index=True))
         st.session_state.df.to_excel(DB_FILE, index=False)
-        st.rerun()
+        st.rerun() # พอสั่ง rerun หน้าจอจะรีเฟรช และ clear_on_submit จะเคลียร์ช่องให้เองครับ
 
 # ตารางและกราฟ
 st.subheader("📈 กราฟและรายการ")
@@ -89,3 +92,4 @@ def to_excel_bytes(df):
     return output.getvalue()
 
 st.download_button("💾 ดาวน์โหลดไฟล์ Excel", data=to_excel_bytes(st.session_state.df), file_name="Financial_Report.xlsx")
+
