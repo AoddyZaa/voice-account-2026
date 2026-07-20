@@ -66,3 +66,23 @@ if st.button("💾 บันทึกการแก้ไข"):
     st.session_state.df = edited_df
     st.session_state.df.to_excel(DB_FILE, index=False)
     st.rerun()
+
+# เพิ่มปุ่มดาวน์โหลดต่อท้ายตาราง
+st.divider()
+st.subheader("📥 ส่งออกข้อมูล (Export to Excel)")
+
+# ฟังก์ชันแปลง DataFrame เป็น Excel
+def to_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Sheet1')
+    return output.getvalue()
+
+# สร้างปุ่มดาวน์โหลด
+df_xlsx = to_excel(st.session_state.df)
+st.download_button(
+    label="💾 ดาวน์โหลดไฟล์ Excel",
+    data=df_xlsx,
+    file_name="Financial_Report_2026.xlsx",
+    mime="application/vnd.ms-excel"
+)
