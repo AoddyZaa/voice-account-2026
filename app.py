@@ -6,7 +6,7 @@ import io
 import requests
 
 # --- ตั้งค่าหน้าจอและ CSS ธีมหวานแหวว ---
-st.set_page_config(page_title="สมุดบัญชี รายรับ รายจ่าย 2026", layout="wide")
+st.set_page_config(page_title="บันทึกรับจ่าย 2026", page_icon="💰", layout="wide")
 
 st.markdown("""
     <style>
