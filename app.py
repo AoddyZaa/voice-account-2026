@@ -91,25 +91,17 @@ valid_accounts = ["ธกส (ลุงอ๊อด)", "กสิกรไทย
 # ⚠️ ลิงก์ Web App ของเจ้านาย
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyNvSt-Ex1n5ix6rqn8Pn9QI1lqQQmlGke-hswGGyAUAPFDMomKXhaBmzWwvNaOJzBDhA/exec"
 
-def format_thai_date(dt_obj):
-    if pd.isna(dt_obj):
-        return ""
-    thai_months = [
-        "", "กรากฎาคม" if False else "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", 
-        "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", 
-        "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-    ]
-    # แปลง ค.ศ. เป็น พ.ศ. (+543)
+def format_thai_date(date_str):
     try:
-        if isinstance(dt_obj, str):
-            dt_obj = pd.to_datetime(dt_obj)
-        day = dt_obj.day
-        month_idx = dt_obj.month
-        year_th = dt_obj.year + 543
-        thai_month_names = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
-        return f"{day} {thai_month_names[month_idx]} {year_th}"
+        clean_date = str(date_str).split('T')[0].strip()
+        dt = datetime.strptime(clean_date, "%Y-%m-%d")
+        day = dt.day
+        month_names = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
+        month_str = month_names[dt.month]
+        year_th = dt.year + 543
+        return f"{day} {month_str} {year_th}"
     except:
-        return str(dt_obj)
+        return str(date_str)
 
 def get_data():
     try:
@@ -150,7 +142,6 @@ with st.sidebar.form("input_form", clear_on_submit=True):
     
     st.markdown("<br>", unsafe_allow_html=True)
     if st.form_submit_button("🚀 บันทึกข้อมูลทันที"): 
-        # แปลงวันที่ที่เลือกให้เป็นรูปแบบ วัน เดือน (ภาษาไทย) ปี พ.ศ. บันทึก
         formatted_date_str = format_thai_date(date_input)
         new_row = {
             "บัญชี": account,
@@ -170,8 +161,6 @@ df = get_data()
 df['รายรับ'] = pd.to_numeric(df['รายรับ'], errors='coerce').fillna(0)
 df['รายจ่าย'] = pd.to_numeric(df['รายจ่าย'], errors='coerce').fillna(0)
 
-# สร้างคอลัมน์ช่วยเทียบเดือนจากข้อความวันที่ไทย หรือแปลงกลับเพื่อทำตัวกรอง
-# (เพื่อให้ระบบกรองเดือนยังทำงานได้แม่นยำแม้ข้อมูลจะเป็นภาษาไทย)
 thai_month_map = {
     "มกราคม": "01", "กุมภาพันธ์": "02", "มีนาคม": "03", "เมษายน": "04",
     "พฤษภาคม": "05", "มิถุนายน": "06", "กรกฎาคม": "07", "สิงหาคม": "08",
