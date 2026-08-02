@@ -102,7 +102,7 @@ def format_thai_date(date_input):
         # ป้องกันปีเกิน 3000 ให้เช็คว่าถ้าปีมากกว่า 2500 แสดงว่าเป็น พ.ศ. อยู่แล้ว
         if dt.year > 2500:
             year_th = dt.year
-        elif dt.year > 2200: # เผื่อกรณีบวกเกิน
+        elif dt.year > 2200:
             year_th = 2026 + 543
         else:
             year_th = dt.year + 543
