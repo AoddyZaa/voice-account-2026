@@ -93,14 +93,18 @@ WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyNvSt-Ex1n5ix6rqn8Pn9QI1
 def format_thai_date(date_input):
     try:
         date_str = str(date_input).strip()
-        # ถ้ามีคำว่า T (รูปแบบ ISO จาก Sheets เก่า) ให้ดึงเฉพาะส่วนปี ค.ศ. เดือน วัน
         if 'T' in date_str:
             clean_date = date_str.split('T')[0].strip()
             dt = datetime.strptime(clean_date, "%Y-%m-%d")
-            year_th = dt.year + 543
         else:
-            # ถ้าเป็น ค.ศ. ปกติ (YYYY-MM-DD)
             dt = datetime.strptime(date_str, "%Y-%m-%d")
+        
+        # ป้องกันปีเกิน 3000 ให้เช็คว่าถ้าปีมากกว่า 2500 แสดงว่าเป็น พ.ศ. อยู่แล้ว
+        if dt.year > 2500:
+            year_th = dt.year
+        elif dt.year > 2200: # เผื่อกรณีบวกเกิน
+            year_th = 2026 + 543
+        else:
             year_th = dt.year + 543
             
         day = dt.day
