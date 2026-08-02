@@ -92,16 +92,20 @@ WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyNvSt-Ex1n5ix6rqn8Pn9QI1
 
 def format_thai_date(date_input):
     try:
-        if isinstance(date_input, str):
-            clean_date = date_input.split('T')[0].strip()
+        date_str = str(date_input).strip()
+        # ถ้ามีคำว่า T (รูปแบบ ISO จาก Sheets เก่า) ให้ดึงเฉพาะส่วนปี ค.ศ. เดือน วัน
+        if 'T' in date_str:
+            clean_date = date_str.split('T')[0].strip()
             dt = datetime.strptime(clean_date, "%Y-%m-%d")
+            year_th = dt.year + 543
         else:
-            dt = pd.to_datetime(date_input)
-        
+            # ถ้าเป็น ค.ศ. ปกติ (YYYY-MM-DD)
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            year_th = dt.year + 543
+            
         day = dt.day
         month_names = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
         month_str = month_names[dt.month]
-        year_th = dt.year + 543
         return f"{day} {month_str} {year_th}"
     except:
         return str(date_input)
@@ -120,7 +124,6 @@ def get_data():
             if col not in df.columns:
                 df[col] = 0 if col in ["รายรับ", "รายจ่าย"] else ""
         
-        # แปลงวันที่ที่อ่านมาให้เป็นรูปแบบไทยเสมอ
         if 'วันที่' in df.columns:
             df['วันที่'] = df['วันที่'].apply(format_thai_date)
             
