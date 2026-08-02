@@ -88,20 +88,23 @@ st.markdown("""
 columns_order = ["บัญชี", "วันที่", "รายการ", "รายรับ", "รายจ่าย"]
 valid_accounts = ["ธกส (ลุงอ๊อด)", "กสิกรไทย (ลุงอ๊อด)", "กสิกรไทย (น้องจอย)", "เงินสด"]
 
-# ⚠️ ลิงก์ Web App ของเจ้านาย
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyNvSt-Ex1n5ix6rqn8Pn9QI1lqQQmlGke-hswGGyAUAPFDMomKXhaBmzWwvNaOJzBDhA/exec"
 
-def format_thai_date(date_str):
+def format_thai_date(date_input):
     try:
-        clean_date = str(date_str).split('T')[0].strip()
-        dt = datetime.strptime(clean_date, "%Y-%m-%d")
+        if isinstance(date_input, str):
+            clean_date = date_input.split('T')[0].strip()
+            dt = datetime.strptime(clean_date, "%Y-%m-%d")
+        else:
+            dt = pd.to_datetime(date_input)
+        
         day = dt.day
         month_names = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
         month_str = month_names[dt.month]
         year_th = dt.year + 543
         return f"{day} {month_str} {year_th}"
     except:
-        return str(date_str)
+        return str(date_input)
 
 def get_data():
     try:
@@ -116,6 +119,11 @@ def get_data():
         for col in columns_order:
             if col not in df.columns:
                 df[col] = 0 if col in ["รายรับ", "รายจ่าย"] else ""
+        
+        # แปลงวันที่ที่อ่านมาให้เป็นรูปแบบไทยเสมอ
+        if 'วันที่' in df.columns:
+            df['วันที่'] = df['วันที่'].apply(format_thai_date)
+            
         return df[columns_order]
     except Exception as e:
         return pd.DataFrame(columns=columns_order)
