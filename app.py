@@ -254,12 +254,17 @@ col_bk1, col_bk2 = st.columns(2)
 with col_bk1:
     st.markdown("### 1. ดาวน์โหลดข้อมูลเก็บไว้ในเครื่อง")
     if not df.empty:
-        csv_data = df[columns_order].to_csv(index=False).encode('utf-8-sig')
+        # สร้างไฟล์ Excel ในหน่วยความจำชั่วคราว
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Sheet1')
+        excel_data = output.getvalue()
+
         st.download_button(
-            label="📥 ดาวน์โหลดไฟล์ Backup (CSV)",
-            data=csv_data,
-            file_name=f"account_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
+            label="📥 ดาวน์โหลดไฟล์สำรองข้อมูล (.xlsx)",
+            data=excel_data,
+            file_name=f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
     else:
@@ -267,10 +272,10 @@ with col_bk1:
 
 with col_bk2:
     st.markdown("### 2. กู้คืนข้อมูลจากไฟล์ CSV เก่า")
-    uploaded_file = st.file_uploader("📂 เลือกไฟล์ CSV หรือ TXT สำหรับกู้คืนข้อมูล", type=["csv", "txt"], key="restore_csv")
+    uploaded_file = st.file_uploader("📂 เลือกไฟล์สำรอง (.xlsx)", type=["xlsx"], key="restore_excel")
     if uploaded_file is not None:
         try:
-            restore_df = pd.read_csv(uploaded_file)
+            restore_df = pd.read_excel(uploaded_file)
             # ตรวจสอบคอลัมน์เบื้องต้นว่ามีครบไหม
             missing_cols = [c for c in columns_order if c not in restore_df.columns]
             if missing_cols:
